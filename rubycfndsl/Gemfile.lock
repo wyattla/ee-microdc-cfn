@@ -1,0 +1,32 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    aws-sdk (2.1.21)
+      aws-sdk-resources (= 2.1.21)
+    aws-sdk-core (2.1.21)
+      jmespath (~> 1.0)
+    aws-sdk-resources (2.1.21)
+      aws-sdk-core (= 2.1.21)
+    cloudformation-ruby-dsl (1.0.4)
+      aws-sdk
+      bundler
+      detabulator
+      diffy
+      highline
+      json
+    detabulator (0.1.0)
+    diffy (3.0.7)
+    highline (1.7.5)
+    jmespath (1.0.2)
+      multi_json (~> 1.0)
+    json (1.8.3)
+    multi_json (1.11.2)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  cloudformation-ruby-dsl
+
+BUNDLED WITH
+   1.10.5
