@@ -11,6 +11,7 @@ require 'cloudformation-ruby-dsl/table'
 environment = ENV['EV_ENVIRONMENT'] || fail('error: no EV_ENVIRONMENT provided')
 application = ENV['EV_APPLICATION'] || fail('error: no EV_APPLICATION provided')
 bucketname = ENV['EV_BUCKET_NAME'] || fail('error: no EV_BUCKET_NAME provided')
+category = 'ee-microdc'
 
 template do
 
@@ -53,6 +54,15 @@ template do
   parameter 'BucketName',
     :Default => bucketname,
     :Description => 'The Project Name',
+    :Type => 'String',
+    :MinLength => '1',
+    :MaxLength => '64',
+    :AllowedPattern => '[a-zA-Z0-9-\.]*',
+    :ConstraintDescription => 'must begin with a letter and contain only alphanumeric characters.'
+
+  parameter 'Category',
+    :Default => category,
+    :Description => 'Category for billing purpose',
     :Type => 'String',
     :MinLength => '1',
     :MaxLength => '64',
@@ -301,6 +311,84 @@ template do
       }
     }
  
+  # ###################################################################################################
+  # Jenkins Instance definition
+ 
+  resource "JenkinsIAMRole",
+    :Type => "AWS::CloudFormation::Stack",
+    :Properties => {
+      :TemplateURL => join("/","https://s3.amazonaws.com",ref('BucketName'),ref('Application'),
+                           ref('EnvironmentName'),'cloudformation','role_jenkins.template'),
+      :Parameters => {
+        :EnvironmentName => ref('EnvironmentName'),
+        :Application => ref('Application'),
+        :BucketName => ref('BucketName'),
+        :AnsibleRole => "jenkins",
+        :Category => ref('Category'),
+      }
+    }
+
+   resource "JenkinsSecurityGroup",
+     :Type => "AWS::CloudFormation::Stack",
+     :Properties => {
+       :TemplateURL => join("/","https://s3.amazonaws.com",ref('BucketName'),ref('Application'),
+                            ref('EnvironmentName'),'cloudformation','securitygroup_jenkins.template'),
+       :Parameters => {
+         :EnvironmentName => ref('EnvironmentName'),
+         :Application => ref('Application'),
+         :VPC => ref('VPC'),
+         :Purpose => 'jenkins',
+         :Category => ref('Category'),
+       }
+     }
+ 
+  resource "Jenkins",
+    :Type => "AWS::CloudFormation::Stack",
+    :Properties => {
+      :TemplateURL => join("/","https://s3.amazonaws.com",ref('BucketName'),ref('Application'),
+                           ref('EnvironmentName'),'cloudformation','ec2_stack_jenkins.template'),
+      :Parameters => {
+        :EnvironmentName => ref('EnvironmentName'),
+        :Application => ref('Application'),
+        :VPC => ref('VPC'),
+        :SubnetId => [ ref('PublicSubnetAZ2') ],
+        :NatAZ1IpAddress => get_att('NatEc2InstanceAZ1v0','Outputs.PublicIp'),
+        :NatAZ2IpAddress => get_att('NatEc2InstanceAZ2v0','Outputs.PublicIp'),
+        :ImageId => 'ami-47a23a30',
+        :InstanceType => 'm3.medium',
+        :KeyName => 'eeadmin',
+        :Purpose => 'jenkins',
+        :Category => ref('Category'),
+        :BucketName => ref('BucketName'),
+        :AnsibleRole => "jenkins",
+        :Role => get_att('JenkinsIAMRole','Outputs.IAMRole'),
+        :SecurityGroup => join(',', get_att('DefaultSecurityGroup','Outputs.SecurityGroup'),
+                               get_att('JenkinsSecurityGroup','Outputs.SecurityGroup'))
+      }
+    }
+ 
+  #resource "ELBJenkins",
+  #  :Type => "AWS::CloudFormation::Stack",
+  #  :Properties => {
+  #    :TemplateURL => join("/","https://s3.amazonaws.com",ref('BucketName'),ref('Application'),
+  #                         ref('EnvironmentName'),'cloudformation','ec2_stack_elb_jenkins.template'),
+  #    :Parameters => {
+  #      :EnvironmentName => ref('EnvironmentName'),
+  #      :Application => ref('Application'),
+  #      :VPC => ref('VPC'),
+  #      :SubnetId => ref('PublicSubnetAZ2'),
+  #      :ImageId => 'ami-47a23a30',
+  #      :InstanceType => 'm3.medium',
+  #      :KeyName => 'eeadmin',
+  #      :Purpose => 'Jenkins',
+  #      :Category => ref('Category'),
+  #      :BucketName => ref('BucketName'),
+  #      :AnsibleRole => "jenkins",
+  #      :Role => get_att('JenkinsIAMRole','Outputs.IAMRole'),
+  #      :SecurityGroup => join(',', get_att('DefaultSecurityGroup','Outputs.SecurityGroup'),
+  #                             get_att('JenkinsSecurityGroup','Outputs.SecurityGroup'))
+  #    }
+  #  }
  
   # ###################################################################################################
   # Private Subnets and routing tables

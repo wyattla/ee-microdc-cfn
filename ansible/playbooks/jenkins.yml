@@ -1,0 +1,7 @@
+- name: Jenkins instance
+  sudo: yes
+  hosts: localhost
+  vars: 
+
+  roles:
+    - ogonna.iwunze.docker
