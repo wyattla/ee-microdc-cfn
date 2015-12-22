@@ -1,0 +1,4 @@
+default_sudo:
+  - name: '%sudo'
+    nopasswd: yes
+    requiretty: yes

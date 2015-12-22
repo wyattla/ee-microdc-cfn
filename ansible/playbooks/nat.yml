@@ -1,0 +1,11 @@
+- include: common.yml
+
+- name: Nat instance
+  sudo: yes
+  hosts: localhost
+  vars: 
+    - iptables_load_path: /etc/sysconfig/iptables-config 
+    - iptables_raw_rules: 
+        - "-t nat -A POSTROUTING -o eth0 -s 10.0.0.0/8 -j MASQUERADE" 
+  roles:
+    - {role: Stouts.iptables, tags: iptables}
