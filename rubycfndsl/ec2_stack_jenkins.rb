@@ -61,6 +61,14 @@ template do
     :AllowedPattern => 'subnet-[a-zA-Z0-9]*',
     :ConstraintDescription => 'must begin with subnet- and contain only alphanumeric characters.'
 
+  parameter 'PublicSubnets',
+    :Description => 'The subnet Id',
+    :Type => 'CommaDelimitedList'
+
+  parameter 'PrivateSubnets',
+    :Description => 'The subnet Id',
+    :Type => 'CommaDelimitedList'
+
   parameter 'ImageId',
     :Description => 'The AMI Id',
     :Type => 'String',
@@ -192,10 +200,10 @@ template do
   resource "ElasticLoadBalancer",
     :Type => "AWS::ElasticLoadBalancing::LoadBalancer",
     :Properties => {
-      :LoadBalancerName => join('-',ref('Application'), ref('EnvironmentName'),'elb','public',ref('Purpose')),
+      :LoadBalancerName => join('-', ref('EnvironmentName'),'elb','public',ref('Purpose')),
       :Scheme => 'internet-facing',
       :SecurityGroups => [ get_att('ELBSecurityGroup','Outputs.SecurityGroup') ],
-      :Subnets => ref('SubnetId'),
+      :Subnets => ref('PublicSubnets'),
       :HealthCheck => {
          :HealthyThreshold => '2',
          :Interval => '5',
@@ -208,7 +216,7 @@ template do
         { :LoadBalancerPort => "80", :InstancePort => "80", :Protocol => "TCP" } 
       ],
       :Tags => [ 
-        { :Key => 'Name', :Value => join('-',ref('Application'),ref('EnvironmentName'),'elb','public',ref('Purpose')) }, 
+        { :Key => 'Name', :Value => join('-',ref('EnvironmentName'),'elb','public',ref('Purpose')) }, 
         { :Key => 'Environment', :Value => ref('EnvironmentName') }, 
         { :Key => 'Application', :Value => ref('Application') }, 
         { :Key => 'Purpose', :Value => ref('Purpose') }, 
