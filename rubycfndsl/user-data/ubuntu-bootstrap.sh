@@ -4,7 +4,7 @@
 # # Bootstrap
 
 # # The bootstrap log file:
-# LOG_FILE=/var/log/bootstrap.log
+LOG_FILE=/var/log/bootstrap.log
 
 # # Script error handling and output redirect
 # set -e                               # Fail on error
