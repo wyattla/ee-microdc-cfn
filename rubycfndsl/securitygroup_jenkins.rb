@@ -59,9 +59,9 @@ template do
     :ConstraintDescription => 'must contain only alphanumeric characters.',
     :AllowedPattern => '[a-zA-Z0-9]*'
 
-  #parameter 'ELBSecurityGroup',
-  #  :Description => 'Instance Purpose',
-  #  :Type => 'String'
+  parameter 'ELBSecurityGroup',
+   :Description => 'Instance Purpose',
+   :Type => 'String'
 
   # Include Mappings under maps/*
 
@@ -77,8 +77,8 @@ template do
       :GroupDescription => join(' ', 'Security Group for', ref('Purpose'), ' - ', ref('Application')),
       :VpcId => ref('VPC'),
       :SecurityGroupIngress => [
-       # { "IpProtocol" => "tcp", "FromPort" => "80", "ToPort" => "80", "SourceSecurityGroupId" => ref('ELBSecurityGroup') },
-       # { "IpProtocol" => "tcp", "FromPort" => "443", "ToPort" => "443", "SourceSecurityGroupId" => ref('ELBSecurityGroup') },
+       { "IpProtocol" => "tcp", "FromPort" => "80", "ToPort" => "80", "SourceSecurityGroupId" => ref('ELBSecurityGroup') },
+       { "IpProtocol" => "tcp", "FromPort" => "443", "ToPort" => "443", "SourceSecurityGroupId" => ref('ELBSecurityGroup') },
       ],
       :Tags => [
         { :Key => 'Name', :Value => join('-', ref('Application'), ref('EnvironmentName'), 'sg', ref('Purpose')) },

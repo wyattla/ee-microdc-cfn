@@ -53,13 +53,8 @@ template do
 
   # Specific parameters
 
-  parameter 'SubnetId',
-    :Description => 'The subnet Id',
-    :Type => 'String',
-    :MinLength => '1',
-    :MaxLength => '64',
-    :AllowedPattern => 'subnet-[a-zA-Z0-9]*',
-    :ConstraintDescription => 'must begin with subnet- and contain only alphanumeric characters.'
+  parameter 'DefaultSecurityGroup',
+    :Type => 'String'
 
   parameter 'PublicSubnets',
     :Description => 'The subnet Id',
@@ -105,14 +100,6 @@ template do
     :ConstraintDescription => 'must contain only alphanumeric characters.',
     :AllowedPattern => '[a-zA-Z0-9-\.]*'
 
-  parameter 'Role',
-    :Description => 'A Role reference',
-    :Type => 'String'
-
-  parameter 'SecurityGroup',
-    :Description => 'A Role reference',
-    :Type => 'CommaDelimitedList'
-
   parameter 'NatAZ1IpAddress',
     :Type => 'String'
 
@@ -127,60 +114,6 @@ template do
 
   # Resource creation
 
-  resource 'IAMInstanceProfile',
-    :Type => "AWS::IAM::InstanceProfile",
-    :Properties => {
-      :Path => "/",
-      :Roles => [ ref('Role') ]
-    }
-
-  resource :EC2Instance,
-    :Type => "AWS::EC2::Instance",
-    :Properties => {
-      :InstanceType => ref("InstanceType"),
-      :KeyName => ref('KeyName'),
-      :IamInstanceProfile => ref('IAMInstanceProfile'),
-      :ImageId => ref('ImageId'),
-      :SourceDestCheck => "false",
-      :NetworkInterfaces => [ {
-        :GroupSet => ref("SecurityGroup"),
-        :DeviceIndex => "0",
-        :DeleteOnTermination => "true",
-        :SubnetId => ref("SubnetId")
-      } ],
-      :Tags => [ 
-        { :Key => 'Name', :Value => join('-',ref('Application'),ref('EnvironmentName'),'ec2',ref('AnsibleRole')) }, 
-        { :Key => 'Environment', :Value => ref('EnvironmentName') }, 
-        { :Key => 'AnsibleRole', :Value => ref('AnsibleRole')}, 
-        { :Key => 'Application', :Value => ref('Application') }, 
-        { :Key => 'Purpose', :Value => ref('Purpose') }, 
-        { :Key => 'BucketName', :Value => ref('BucketName') },
-        { :Key => 'Category', :Value => ref('Category') }
-      ],
-      :UserData => base64(interpolate(file('user-data/ubuntu-bootstrap.sh')))
-    }
-
-    # resource 'WaitHandle',
-    #   :Type => "AWS::CloudFormation::WaitConditionHandle"
-
-    # resource 'WaitCondition',
-    #   :Type => "AWS::CloudFormation::WaitCondition",
-    #   :DependsOn => "EC2Instance",
-    #   :Properties => {
-    #     :Handle => ref('WaitHandle'),
-    #     :Timeout => "500"
-    #   }
-
-    output 'EC2Instance',
-      :Value => ref('EC2Instance'),
-      :Description => ' Instance Id'
-
-#    output 'PublicIp',
-#      :Value => get_att('EC2Instance','PublicIp'),
-#      :Description => 'Instance public ip address'
-
-  # The elastic load balanecer
-
   resource "ELBSecurityGroup",
     :Type => "AWS::CloudFormation::Stack",
     :Properties => {
@@ -192,15 +125,15 @@ template do
          :EnvironmentName => ref('EnvironmentName'),
          :Application => ref('Application'),
          :VPC => ref('VPC'),
-         :Purpose => ref('Purpose'),
-         :Category => ref('Category')
+         :Purpose => ref('Purpose'),       
+         :Category => ref('Category'),
        }
     }
 
   resource "ElasticLoadBalancer",
     :Type => "AWS::ElasticLoadBalancing::LoadBalancer",
     :Properties => {
-      :LoadBalancerName => join('-', ref('EnvironmentName'),'elb','public',ref('Purpose')),
+      :LoadBalancerName => join('-',ref('Application'),'elb','public',ref('Purpose')),
       :Scheme => 'internet-facing',
       :SecurityGroups => [ get_att('ELBSecurityGroup','Outputs.SecurityGroup') ],
       :Subnets => ref('PublicSubnets'),
@@ -216,12 +149,107 @@ template do
         { :LoadBalancerPort => "80", :InstancePort => "80", :Protocol => "TCP" } 
       ],
       :Tags => [ 
-        { :Key => 'Name', :Value => join('-',ref('EnvironmentName'),'elb','public',ref('Purpose')) }, 
+        { :Key => 'Name', :Value => join('-',ref('Application'),ref('EnvironmentName'),'elb','public',ref('Purpose')) }, 
         { :Key => 'Environment', :Value => ref('EnvironmentName') }, 
         { :Key => 'Application', :Value => ref('Application') }, 
         { :Key => 'Purpose', :Value => ref('Purpose') }, 
         { :Key => 'Type', :Value => 'public' }, 
       ],
+    }
+
+  # The Load balancer name
+
+  # resource "RecordSet",
+  #   :Type => "AWS::Route53::RecordSet",
+  #   :Properties => { 
+  #     :HostedZoneName => join('',ref('HostedZone'),'.'),
+  #     :Comment => join('',"DNS name for ELB ",ref('Purpose')),
+  #     :Name => join('','jenkins','.',ref('HostedZone'),'.'),
+  #     :Type => "CNAME",
+  #     :TTL => "60",
+  #     :ResourceRecords => [ get_att('ElasticLoadBalancer', 'DNSName')]
+  #   }
+
+  # The instance security group
+
+  resource "SecurityGroup",
+    :Type => "AWS::CloudFormation::Stack",
+    :Properties => {
+      :TemplateURL => join('/', 'https://s3.amazonaws.com', ref('BucketName'), ref('Application'),
+                           ref('EnvironmentName'), 'cloudformation', join('','securitygroup_',ref('Purpose'),'.template')),
+       :Parameters => {
+         :EnvironmentName => ref('EnvironmentName'),
+         :Application => ref('Application'),
+         :Category => ref('Category'),
+         :VPC => ref('VPC'),
+         :Purpose => ref('Purpose'),
+         :ELBSecurityGroup => get_att('ELBSecurityGroup','Outputs.SecurityGroup') 
+       }
+    }
+
+  # The instance role
+
+  resource "Role",
+    :Type => "AWS::CloudFormation::Stack",
+    :Properties => {
+      :TemplateURL => join('/', 'https://s3.amazonaws.com', ref('BucketName'), ref('Application'),
+                           ref('EnvironmentName'), 'cloudformation', join('','role_',ref('Purpose'),'.template')),
+      :Parameters => {
+        :EnvironmentName => ref('EnvironmentName'),
+        :Application => ref('Application'),
+        :BucketName => ref('BucketName'),
+        :AnsibleRole => ref('Purpose'),
+        :Category => ref('Category'),
+      }
+    }
+
+  resource 'IAMInstanceProfile',
+    :Type => "AWS::IAM::InstanceProfile",
+    :Properties => {
+      :Path => "/",
+      :Roles => [ get_att('Role','Outputs.IAMRole') ]
+    }
+
+  # The instance auto scaling group
+
+  resource 'ServerGroup',
+    :Type => 'AWS::AutoScaling::AutoScalingGroup',
+    :Properties => {
+      :VPCZoneIdentifier => ref('PrivateSubnets'),
+      :LaunchConfigurationName => ref('LaunchConfig'),
+      :LoadBalancerNames => [ref('ElasticLoadBalancer')],
+      :MinSize => '1',
+      :MaxSize => '1',
+      :DesiredCapacity => '1',
+      :Tags => [
+        { :Key => 'Name', :Value => join('-',ref('Application'),ref('EnvironmentName'),'ec2',ref('AnsibleRole')), :PropagateAtLaunch => "true"}, 
+        { :Key => 'Environment', :Value => ref('EnvironmentName') , :PropagateAtLaunch => "true"}, 
+        { :Key => 'AnsibleRole', :Value => ref('AnsibleRole'), :PropagateAtLaunch => "true"}, 
+        { :Key => 'Application', :Value => ref('Application'), :PropagateAtLaunch => "true"}, 
+        { :Key => 'BucketName', :Value => ref('BucketName'), :PropagateAtLaunch => "true"}, 
+        { :Key => 'Purpose', :Value => ref('Purpose'), :PropagateAtLaunch => "true"}, 
+      ]
+    }
+
+  resource 'LaunchConfig',
+    :Type => 'AWS::AutoScaling::LaunchConfiguration',
+    :Properties => {
+      :AssociatePublicIpAddress => "false",
+      :IamInstanceProfile => ref('IAMInstanceProfile'),
+      :KeyName => ref('KeyName'),
+      :ImageId => ref('ImageId'),
+      :SecurityGroups => [ 
+        get_att('SecurityGroup','Outputs.SecurityGroup'),
+        ref('DefaultSecurityGroup')
+      ],
+      :InstanceType => ref('InstanceType'),
+      :UserData => base64(interpolate(file('user-data/ubuntu-bootstrap.sh'))),
+      :BlockDeviceMappings => [
+        {
+          :DeviceName => "/dev/sda1",
+          :Ebs => { :VolumeSize => "100" } 
+        },
+      ]
     }
 
 end.exec!

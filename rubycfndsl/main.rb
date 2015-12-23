@@ -313,41 +313,18 @@ template do
  
   # ###################################################################################################
   # Jenkins Instance definition
- 
-  resource "JenkinsIAMRole",
-    :Type => "AWS::CloudFormation::Stack",
-    :Properties => {
-      :TemplateURL => join("/","https://s3.amazonaws.com",ref('BucketName'),ref('Application'),
-                           ref('EnvironmentName'),'cloudformation','role_jenkins.template'),
-      :Parameters => {
-        :EnvironmentName => ref('EnvironmentName'),
-        :Application => ref('Application'),
-        :BucketName => ref('BucketName'),
-        :AnsibleRole => "jenkins",
-        :Category => ref('Category'),
-      }
-    }
 
-   resource "JenkinsSecurityGroup",
-     :Type => "AWS::CloudFormation::Stack",
-     :Properties => {
-       :TemplateURL => join("/","https://s3.amazonaws.com",ref('BucketName'),ref('Application'),
-                            ref('EnvironmentName'),'cloudformation','securitygroup_jenkins.template'),
-       :Parameters => {
-         :EnvironmentName => ref('EnvironmentName'),
-         :Application => ref('Application'),
-         :VPC => ref('VPC'),
-         :Purpose => 'jenkins',
-         :Category => ref('Category'),
-       }
-     }
- 
-  resource "Jenkins",
+    resource "JENKINSStack",
     :Type => "AWS::CloudFormation::Stack",
+    :DependsOn => "NatEc2InstanceAZ1v0",
     :Properties => {
       :TemplateURL => join("/","https://s3.amazonaws.com",ref('BucketName'),ref('Application'),
                            ref('EnvironmentName'),'cloudformation','ec2_stack_jenkins.template'),
       :Parameters => {
+        :NatAZ1IpAddress => get_att('NatEc2InstanceAZ1v0','Outputs.PublicIp'),
+        :NatAZ2IpAddress => fn_if('CreateMultipleAZs',
+                                  get_att('NatEc2InstanceAZ2v0','Outputs.PublicIp'),
+                                  get_att('NatEc2InstanceAZ1v0','Outputs.PublicIp')),
         :EnvironmentName => ref('EnvironmentName'),
         :Application => ref('Application'),
         :VPC => ref('VPC'),
@@ -357,21 +334,76 @@ template do
         :PublicSubnets => fn_if('CreateMultipleAZs',
                                 join(',',ref('PublicSubnetAZ1'),ref('PublicSubnetAZ2')),
                                 ref('PublicSubnetAZ1')),
-        :SubnetId => ref('PublicSubnetAZ2'),
-        :NatAZ1IpAddress => get_att('NatEc2InstanceAZ1v0','Outputs.PublicIp'),
-        :NatAZ2IpAddress => get_att('NatEc2InstanceAZ2v0','Outputs.PublicIp'),
         :ImageId => 'ami-47a23a30',
         :InstanceType => 'm3.medium',
         :KeyName => 'eeadmin',
         :Purpose => 'jenkins',
-        :Category => ref('Category'),
         :BucketName => ref('BucketName'),
         :AnsibleRole => "jenkins",
-        :Role => get_att('JenkinsIAMRole','Outputs.IAMRole'),
-        :SecurityGroup => join(',', get_att('DefaultSecurityGroup','Outputs.SecurityGroup'),
-                               get_att('JenkinsSecurityGroup','Outputs.SecurityGroup'))
+        :Category => ref('Category'),
+        #:HostedZone => 'api-cdt-test.elsevier.com',
+        :DefaultSecurityGroup => get_att('DefaultSecurityGroup','Outputs.SecurityGroup')
       }
     }
+ 
+  # resource "JenkinsIAMRole",
+  #   :Type => "AWS::CloudFormation::Stack",
+  #   :Properties => {
+  #     :TemplateURL => join("/","https://s3.amazonaws.com",ref('BucketName'),ref('Application'),
+  #                          ref('EnvironmentName'),'cloudformation','role_jenkins.template'),
+  #     :Parameters => {
+  #       :EnvironmentName => ref('EnvironmentName'),
+  #       :Application => ref('Application'),
+  #       :BucketName => ref('BucketName'),
+  #       :AnsibleRole => "jenkins",
+  #       :Category => ref('Category'),
+  #     }
+  #   }
+
+  #  resource "JenkinsSecurityGroup",
+  #    :Type => "AWS::CloudFormation::Stack",
+  #    :Properties => {
+  #      :TemplateURL => join("/","https://s3.amazonaws.com",ref('BucketName'),ref('Application'),
+  #                           ref('EnvironmentName'),'cloudformation','securitygroup_jenkins.template'),
+  #      :Parameters => {
+  #        :EnvironmentName => ref('EnvironmentName'),
+  #        :Application => ref('Application'),
+  #        :VPC => ref('VPC'),
+  #        :Purpose => 'jenkins',
+  #        :Category => ref('Category'),
+  #      }
+  #    }
+ 
+  # resource "Jenkins",
+  #   :Type => "AWS::CloudFormation::Stack",
+  #   :Properties => {
+  #     :TemplateURL => join("/","https://s3.amazonaws.com",ref('BucketName'),ref('Application'),
+  #                          ref('EnvironmentName'),'cloudformation','ec2_stack_jenkins.template'),
+  #     :Parameters => {
+  #       :EnvironmentName => ref('EnvironmentName'),
+  #       :Application => ref('Application'),
+  #       :VPC => ref('VPC'),
+  #       :PrivateSubnets => fn_if('CreateMultipleAZs',
+  #                                join(',',ref('PrivateSubnetAZ1'),ref('PrivateSubnetAZ2')),
+  #                                ref('PrivateSubnetAZ1')),
+  #       :PublicSubnets => fn_if('CreateMultipleAZs',
+  #                               join(',',ref('PublicSubnetAZ1'),ref('PublicSubnetAZ2')),
+  #                               ref('PublicSubnetAZ1')),
+  #       :SubnetId => ref('PublicSubnetAZ2'),
+  #       :NatAZ1IpAddress => get_att('NatEc2InstanceAZ1v0','Outputs.PublicIp'),
+  #       :NatAZ2IpAddress => get_att('NatEc2InstanceAZ2v0','Outputs.PublicIp'),
+  #       :ImageId => 'ami-47a23a30',
+  #       :InstanceType => 'm3.medium',
+  #       :KeyName => 'eeadmin',
+  #       :Purpose => 'jenkins',
+  #       :Category => ref('Category'),
+  #       :BucketName => ref('BucketName'),
+  #       :AnsibleRole => "jenkins",
+  #       :Role => get_att('JenkinsIAMRole','Outputs.IAMRole'),
+  #       :SecurityGroup => join(',', get_att('DefaultSecurityGroup','Outputs.SecurityGroup'),
+  #                              get_att('JenkinsSecurityGroup','Outputs.SecurityGroup'))
+  #     }
+  #   }
  
   #resource "ELBJenkins",
   #  :Type => "AWS::CloudFormation::Stack",
