@@ -140,7 +140,7 @@ template do
       :HealthCheck => {
          :HealthyThreshold => '2',
          :Interval => '5',
-         :Target => 'TCP:443',
+         :Target => 'TCP:80',
          :Timeout => '2',
          :UnhealthyThreshold => '2'
       },
