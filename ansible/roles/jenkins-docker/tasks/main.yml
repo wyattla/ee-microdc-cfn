@@ -1,0 +1,14 @@
+---
+
+- name: Create docker build context directory for jenkins
+  file: path={{ jenkins_docker_dir }} state=directory
+
+- name: Copy docker build files 
+  copy: src={{ item }} dest={{ jenkins_docker_dir }}/{{ item }}
+  with_items:
+    - Dockerfile
+    - docker-compose.yml
+    - plugins.txt
+
+- name: Start Jenkins container
+  shell: docker-compose up -d chdir={{ jenkins_docker_dir }}

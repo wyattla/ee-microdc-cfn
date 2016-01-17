@@ -5,3 +5,4 @@
 
   roles:
     - ogonna.iwunze.docker
+    - jenkins-docker
